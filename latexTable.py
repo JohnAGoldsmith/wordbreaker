@@ -83,4 +83,4 @@ def MakeLatexTable(datalines, outfile):
 	print >>outfile, tableend	
 	print >>outfile, footer3	 
 
-	outfile.close()
+	#outfile.close()
