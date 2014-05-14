@@ -417,20 +417,21 @@ class Lexicon:
 		self.m_PrecisionRecallHistory.append((iteration_number,  total_break_precision,total_break_recall))
 
 		# precision for word discovery:
-		true_positives = 0
-		for (word, this_words_entry) in self.m_EntryDict:
-			if word in self.m_TrueDictionary:
-				true_count = self.m_TrueDictionary[word]
-				these_true_positives = min(hypothetical_count, this_words_entry.m_Count)
-			else:
-				these_true_positives = 0
-			true_positives += these_true_positives
-		word_recall = float(true_positives) / self.m_NumberOfTrueRunningWords
-		word_precision = float(true_positives) / self.m_NumberofHypothesizedRunningWords
+		if (False):
+			true_positives = 0
+			for (word, this_words_entry) in self.m_EntryDict.iteritems():
+				if word in self.m_TrueDictionary:
+					true_count = self.m_TrueDictionary[word]
+					these_true_positives = min(hypothetical_count, this_words_entry.m_Count)
+				else:
+					these_true_positives = 0
+				true_positives += these_true_positives
+			word_recall = float(true_positives) / self.m_NumberOfTrueRunningWords
+			word_precision = float(true_positives) / self.m_NumberofHypothesizedRunningWords
 
-		print >>outfile, "\n\n***\n"
-		print >>outfile, "Word Precision", word_precision, "recall", word_recall
-		print "Word Precision  %6.4f; Word Recall  %6.4f" %(word_precision ,word_recall)
+			print >>outfile, "\n\n***\n"
+			print >>outfile, "Word Precision", word_precision, "recall", word_recall
+			print "Word Precision  %6.4f; Word Recall  %6.4f" %(word_precision ,word_recall)
 
 
 
@@ -455,7 +456,7 @@ g_encoding =  "asci"
 numberofcycles = 11
 howmanycandidatesperiteration = 25
 numberoflines =  0
-corpusfilename = "../../data/english/Browncorpus.txt"
+corpusfilename = "../../data/english/browncorpus.txt"
 outfilename = "wordbreaker-brownC-" + str(numberofcycles) + "i.txt" 	
 outfile 	= open (outfilename, "w")
 
