@@ -38,9 +38,11 @@ class LexiconEntry:
 # ---------------------------------------------------------#
 class Lexicon:
 	def __init__(self):
-		#self.m_EntryList = list()
+		self.m_LetterDict=dict() 
+		self.m_LetterPlog = dict()
 		self.m_EntryDict = dict()
 		self.m_TrueDictionary = dict()
+		self.m_DictionaryLength = 0   #in bits! Check this is base 2, looks like default base in python
 		self.m_Corpus 	= list()
 		self.m_SizeOfLongestEntry = 0
 		self.m_CorpusCost = 0.0
@@ -50,7 +52,11 @@ class Lexicon:
 		self.m_BreakPointList = list()
 		self.m_DeletionList = list()  # these are the words that were nominated and then not used in any line-parses *at all*.
 		self.m_DeletionDict = dict()  # They never stop getting nominated.
-		self.m_PrecisionRecallHistory = list()
+		self.m_Break_based_RecallPrecisionHistory = list()
+		self.m_Token_based_RecallPrecisionHistory = list()
+		self.m_Type_based_RecallPrecisionHistory = list()
+		self.m_DictionaryLengthHistory = list()
+		self.m_CorpusCostHistory = list()
 	# ---------------------------------------------------------#
 	def AddEntry(self,key,count):
 		this_entry = LexiconEntry(key,count)
@@ -58,12 +64,17 @@ class Lexicon:
 		if len(key) > self.m_SizeOfLongestEntry:
 			self.m_SizeOfLongestEntry = len(key)
 	# ---------------------------------------------------------#	
+	# Found bug here July 5 2015: important, don't let it remove a singleton letter! John
 	def FilterZeroCountEntries(self, iteration_number):
 		for key, entry in self.m_EntryDict.items():
+			if len(key) == 1:
+				entry.m_Count = 1
+				continue
 			if entry.m_Count == 0:
 				self.m_DeletionList.append((key, iteration_number))
 				self.m_DeletionDict[key] = 1
 				del self.m_EntryDict[key]
+				print "Excluding this bad candidate: ", key
 	# ---------------------------------------------------------#
 	def ReadCorpus(self, infilename):
 		print "Name of data file: ", infilename
@@ -119,12 +130,19 @@ class Lexicon:
 					this_lexicon_entry.m_Count = 1
 					self.m_EntryDict[letter] = this_lexicon_entry					 
 				else:
-					self.m_EntryDict[letter].m_Count += 1			 
+					self.m_EntryDict[letter].m_Count += 1	
+				if letter not in self.m_LetterDict:
+					self.m_LetterDict[letter] = 1
+				else:
+					self.m_LetterDict[letter] += 1		 
 			if numberoflines > 0 and len(self.m_Corpus) > numberoflines:
 				break		 
 			self.m_BreakPointList.append(breakpoint_list)
 		self.m_SizeOfLongestEntry = 1	
 		self.ComputeDictFrequencies()
+
+
+
 # ---------------------------------------------------------#
 	def ComputeDictFrequencies(self):
 		TotalCount = 0
@@ -132,6 +150,24 @@ class Lexicon:
 			TotalCount += entry.m_Count
 		for (key, entry) in self.m_EntryDict.iteritems():
 			entry.m_Frequency = entry.m_Count/float(TotalCount)
+		TotalCount = 0
+		for (letter, count) in self.m_LetterDict.iteritems():
+			TotalCount += count
+		for (letter, count) in self.m_LetterDict.iteritems():
+			self.m_LetterDict[letter] = float(count)/float(TotalCount)
+			self.m_LetterPlog[letter] = -1 * math.log(self.m_LetterDict[letter])
+# ---------------------------------------------------------#
+	# added july 2015 john
+	def ComputeDictionaryLength(self):
+		DictionaryLength = 0
+		for word in self.m_EntryDict:
+			wordlength = 0
+			letters = list(word)
+			for letter in letters:
+				wordlength += self.m_LetterPlog[letter]
+			DictionaryLength += wordlength
+		self.m_DictionaryLength = DictionaryLength
+		self.m_DictionaryLengthHistory.append(DictionaryLength)
 			 
 # ---------------------------------------------------------#
 	def ParseCorpus(self, outfile, current_iteration):
@@ -146,12 +182,19 @@ class Lexicon:
 			self.m_ParsedCorpus.append(parsed_line)
 			self.m_CorpusCost += bit_cost
 			for word in parsed_line:
+				#if len(word) == 0:
+				#	print "line 154, about to crash:", line, parsed_line
 				self.m_EntryDict[word].m_Count +=1
 				self.m_NumberOfHypothesizedRunningWords += 1
 		self.FilterZeroCountEntries(current_iteration)
 		self.ComputeDictFrequencies()
-		print "\nCorpus cost: ", "{:,}".format(self.m_CorpusCost)
+		self.ComputeDictionaryLength()
+		print "\nCorpus     cost: ", "{:,}".format(int(self.m_CorpusCost))
+		print   "Dictionary cost: ", "{:,}".format(int(self.m_DictionaryLength))
+		sum = int(self.m_CorpusCost + self.m_DictionaryLength)
+		print   "Total      cost: ", "{:,}".format(sum)
 		print >>outfile, "\nCorpus cost: ", "{:,}".format(self.m_CorpusCost)
+		print >>outfile, "\Dictionary cost: ", "{:,}".format(self.m_DictionaryLength)
 		return  
 # ---------------------------------------------------------#		 	 
 	def PrintParsedCorpus(self,outfile):
@@ -203,7 +246,11 @@ class Lexicon:
 				Parse[outerscan] = list()
 			if verboseflag: print >>outfile, "\n\t\t\t\t\t\t\t\tchosen:", LastChunk,
 			Parse[outerscan].append(LastChunk)
-			 
+
+			#if len(LastChunk) == 0:
+			#	print >>outfile, "line 212", word, Parse[outerscan]		 
+			#	print "line 212", word, "outerscan:", outerscan, "Last chunk:", LastChunk, Parse[outerscan]		
+
 		if verboseflag: 
 			PrintList(Parse[wordlength], outfile)
 		bitcost = BestCompressedLength[outerscan]
@@ -229,12 +276,12 @@ class Lexicon:
 				NomineeList.append((nominee,count))
 			if len(NomineeList) == howmany:
 				break
-		print "Nominees:"
+		#print "Nominees:"
 		latex_data= list()
 		latex_data.append("piece   count   status")
 		for nominee, count in NomineeList:
 			self.AddEntry(nominee,count)
-			print "(", nominee, "{:,}".format(count),")",
+			print "%20s   %8i" %(nominee, count)
 			latex_data.append(nominee +  "\t" + "{:,}".format(count) )
 		MakeLatexTable(latex_data,outfile)
 		self.ComputeDictFrequencies()
@@ -313,7 +360,7 @@ class Lexicon:
 			print >>outfile, iteration, key
 
 # ---------------------------------------------------------#
-	def PrecisionRecall(self, iteration_number, outfile,total_word_count_in_parse):
+	def RecallPrecision(self, iteration_number, outfile,total_word_count_in_parse):
 		 
 		total_true_positive_for_break = 0
 		total_number_of_hypothesized_words = 0
@@ -407,40 +454,69 @@ class Lexicon:
 			total_number_of_true_words += number_of_true_words
 
 
+		 
+
+
 
 		# the following calculations are precision and recall *for breaks* (not for morphemes)
+
+		formatstring = "%30s %6.4f %12s %6.4f"
 		total_break_precision = float(total_true_positive_for_break) /  total_number_of_hypothesized_words 
 		total_break_recall    = float(total_true_positive_for_break) /  total_number_of_true_words 	
-		print >>outfile, "\n\n***\n"
-		print >>outfile, "Precision", total_break_precision, "recall", total_break_recall
-		print "Precision  %6.4f; Recall  %6.4f" %(total_break_precision ,total_break_recall)
-		self.m_PrecisionRecallHistory.append((iteration_number,  total_break_precision,total_break_recall))
+		self.m_CorpusCostHistory.append( self.m_CorpusCost)
+		self.m_Break_based_RecallPrecisionHistory.append((iteration_number,  total_break_precision,total_break_recall))
+		print            formatstring %( "Break based Word Precision", total_break_precision, "recall", total_break_recall)
+		print >>outfile, formatstring %( "Break based Word Precision", total_break_precision, "recall", total_break_recall)
+		
+		# Token_based precision for word discovery:
+		
 
-		# precision for word discovery:
-		if (False):
+
+		if (True):
 			true_positives = 0
 			for (word, this_words_entry) in self.m_EntryDict.iteritems():
 				if word in self.m_TrueDictionary:
 					true_count = self.m_TrueDictionary[word]
-					these_true_positives = min(hypothetical_count, this_words_entry.m_Count)
+					these_true_positives = min(true_count, this_words_entry.m_Count)
 				else:
 					these_true_positives = 0
 				true_positives += these_true_positives
 			word_recall = float(true_positives) / self.m_NumberOfTrueRunningWords
-			word_precision = float(true_positives) / self.m_NumberofHypothesizedRunningWords
+			word_precision = float(true_positives) / self.m_NumberOfHypothesizedRunningWords
+			self.m_Token_based_RecallPrecisionHistory.append((iteration_number,  word_precision,word_recall))
 
-			print >>outfile, "\n\n***\n"
-			print >>outfile, "Word Precision", word_precision, "recall", word_recall
-			print "Word Precision  %6.4f; Word Recall  %6.4f" %(word_precision ,word_recall)
+			print >>outfile, formatstring %( "Token_based Word Precision", word_precision, "recall", word_recall)
+			print            formatstring %( "Token_based Word Precision", word_precision, "recall", word_recall)
+ 
 
-
+		# Type_based precision for word discovery:
+		if (True):
+			true_positives = 0
+			for (word, this_words_entry) in self.m_EntryDict.iteritems():
+				if word in self.m_TrueDictionary:
+					true_positives +=1
+			word_recall = float(true_positives) / len(self.m_TrueDictionary)
+			word_precision = float(true_positives) / len(self.m_EntryDict)
+			self.m_Type_based_RecallPrecisionHistory.append((iteration_number,  word_precision,word_recall))
+			
+			#print >>outfile, "\n\n***\n"
+#			print "Type_based Word Precision  %6.4f; Word Recall  %6.4f" %(word_precision ,word_recall)
+			print >>outfile, formatstring %( "Type_based Word Precision", word_precision, "recall", word_recall)
+			print            formatstring %( "Type_based Word Precision", word_precision, "recall", word_recall)
 
 # ---------------------------------------------------------#
-	def PrintPrecisionRecall(self,outfile):	
-		print >>outfile, "\n\nBreak precision and recall"
-		for iterno, precision,recall in self.m_PrecisionRecallHistory:
-			print >>outfile,"%3d %8.3f  %8.3f" %(iterno, precision , recall)
-	
+	def PrintRecallPrecision(self,outfile):	
+		print >>outfile, "\t\t\tBreak\t\tToken-based\t\tType-based"
+		print >>outfile, "\t\t\tprecision\trecall\tprecision\trecall\tprecision\trecall"
+		for iterno in (range(numberofcycles-1)):
+			print "printing iterno", iterno
+			(iteration, p1,r1) = self.m_Break_based_RecallPrecisionHistory[iterno]
+			(iteration, p2,r2) = self.m_Token_based_RecallPrecisionHistory[iterno]
+			(iteration, p3,r3) = self.m_Type_based_RecallPrecisionHistory[iterno]
+			cost1 = int(self.m_DictionaryLengthHistory[iterno])
+			cost2 = int(self.m_CorpusCostHistory[iterno] )
+			#print >>outfile,"%3i\t%8.3f\t%8.3f\t%8.3f\t%8.3f\t%8.3f\t%8.3f" %(iteration, r1,p1,r2,p2,r3,p3)
+			print >>outfile, iteration,"\t",cost1, "\t", cost2, "\t", p1,"\t",r1,"\t",p2,"\t",r2,"\t",p3,"\t",r3
 			
 
 # ---------------------------------------------------------#
@@ -451,32 +527,69 @@ def PrintList(my_list, outfile):
 
 
 
-total_word_count_in_parse =0
-g_encoding =  "asci"  
-numberofcycles = 11
-howmanycandidatesperiteration = 25
-numberoflines =  0
-corpusfilename = "../../data/english/browncorpus.txt"
-outfilename = "wordbreaker-brownC-" + str(numberofcycles) + "i.txt" 	
-outfile 	= open (outfilename, "w")
+total_word_count_in_parse 	= 0
+g_encoding 			= "utf8"  
+numberofcycles 			= 200
+howmanycandidatesperiteration 	= 25
+numberoflines 			=  0
+ 
+datadirectory 			= "../../data/english/"
+corpusfile 			= "browncorpus.txt"
+shortoutname 			= "wordbreaker-brownC-" 
+
+datadirectory 			= "../../data/french/"
+corpusfile 			= "encarta_french_UTF8.txt"
+shortoutname 			= "wordbreaker-encarta-" 
+
+datadirectory 			= "../../data/spanish/"
+corpusfile 			= "DonQuijoteutf8.txt"
+shortoutname 			= "wordbreaker-donquijote-" 
+
+
+corpusfilename 			= datadirectory  + corpusfile
+outdirectory 			= datadirectory + "wordbreaking/"
+outfilename 			= outdirectory + shortoutname+ str(numberofcycles) + "i.txt" 	
+outfile_corpus_name= outdirectory + shortoutname + str(numberofcycles) + "_brokencorpus.txt"
+outfile_lexicon_name= outdirectory + shortoutname+ str(numberofcycles) + "_lexicon.txt"
+outfile_RecallPrecision_name= outdirectory + shortoutname + str(numberofcycles) +  "_RecallPrecision.tsv"
+
+if g_encoding == "utf8":
+	outfile = codecs.open(outfilename, "w", encoding = 'utf-8')
+	outfile_corpus = codecs.open(outfile_corpus_name, "w", encoding = 'utf-8')
+	outfile_lexicon = codecs.open(outfile_lexicon_name, "w",encoding = 'utf-8')
+	outfile_RecallPrecision = codecs.open(outfile_RecallPrecision_name, "w", encoding = 'utf-8')
+else:
+	outfile = open(outfilename, "w") 	
+	outfile_corpus = open(outfile_corpus_name, "w")
+	outfile_lexicon = open(outfile_lexicon_name, "w")
+	outfile_RecallPrecision = open(outfile_RecallPrecision_name, "w")
+
+print >>outfile, "#" + str(corpusfile)
+print >>outfile, "#" + str(numberofcycles) + " cycles."
+print >>outfile, "#" + str(numberoflines) + " lines in the original corpus."
+print >>outfile, "#" + str(howmanycandidatesperiteration) + " candidates on each cycle."
 
 current_iteration = 0	
 this_lexicon = Lexicon()
 this_lexicon.ReadBrokenCorpus (corpusfilename, numberoflines)
+print >>outfile, "#" + str(len(this_lexicon.m_TrueDictionary)) + " distinct words in the original corpus."
+
 this_lexicon.ParseCorpus (outfile, current_iteration)
 
-
 for current_iteration in range(1, numberofcycles):
-	print "\n Iteration number", current_iteration
+	print "\n Iteration number", current_iteration, "out of ", numberofcycles
 	print >>outfile, "\n\n Iteration number", current_iteration
 	this_lexicon.GenerateCandidates(howmanycandidatesperiteration, outfile)
 	this_lexicon.ParseCorpus (outfile, current_iteration)
-	this_lexicon.PrecisionRecall(current_iteration, outfile,total_word_count_in_parse)
+	this_lexicon.RecallPrecision(current_iteration, outfile,total_word_count_in_parse)
 	
-this_lexicon.PrintParsedCorpus(outfile)
-this_lexicon.PrintLexicon(outfile)
-this_lexicon.PrintPrecisionRecall(outfile) 	 
+this_lexicon.PrintParsedCorpus(outfile_corpus)
+this_lexicon.PrintLexicon(outfile_lexicon)
+this_lexicon.PrintRecallPrecision(outfile_RecallPrecision) 	 
 outfile.close()
+outfile_corpus.close()
+outfile_lexicon.close()
+outfile_RecallPrecision.close()
 
 
 

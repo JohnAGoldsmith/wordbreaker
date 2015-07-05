@@ -65,7 +65,6 @@ def MakeLatexTable(datalines, outfile):
 	print >>outfile, start1, start2, start3
 	print >>outfile, tablestart
 	for i in range (len (table)):
-		print "B:", table[i]
 		for j  in range(len(table[i])):
 			item = table[i][j]
 			packing = columnwidth - len(item)
