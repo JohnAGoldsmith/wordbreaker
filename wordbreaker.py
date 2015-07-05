@@ -10,7 +10,45 @@ import copy
 import math
 from latexTable import MakeLatexTable
 
+
+
+total_word_count_in_parse 	= 0
+g_encoding 			= "utf8"  
+numberofcycles 			= 200
+howmanycandidatesperiteration 	= 25
+numberoflines 			=  0
+ 
+datadirectory 			= "../../data/english/"
+corpusfile 			= "browncorpus.txt"
+shortoutname 			= "wordbreaker-brownC-" 
+
+datadirectory 			= "../../data/french/"
+corpusfile 			= "encarta_french_UTF8.txt"
+shortoutname 			= "wordbreaker-encarta-" 
+
+datadirectory 			= "../../data/spanish/"
+corpusfile 			= "DonQuijoteutf8.txt"
+shortoutname 			= "wordbreaker-donquijote-" 
+
+
+
 verboseflag = False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Jan 6: added precision and recall.
 
@@ -525,25 +563,6 @@ def PrintList(my_list, outfile):
 	for item in my_list:
 		print >>outfile, item,  
 
-
-
-total_word_count_in_parse 	= 0
-g_encoding 			= "utf8"  
-numberofcycles 			= 200
-howmanycandidatesperiteration 	= 25
-numberoflines 			=  0
- 
-datadirectory 			= "../../data/english/"
-corpusfile 			= "browncorpus.txt"
-shortoutname 			= "wordbreaker-brownC-" 
-
-datadirectory 			= "../../data/french/"
-corpusfile 			= "encarta_french_UTF8.txt"
-shortoutname 			= "wordbreaker-encarta-" 
-
-datadirectory 			= "../../data/spanish/"
-corpusfile 			= "DonQuijoteutf8.txt"
-shortoutname 			= "wordbreaker-donquijote-" 
 
 
 corpusfilename 			= datadirectory  + corpusfile
