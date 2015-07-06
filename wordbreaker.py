@@ -15,12 +15,12 @@ from latexTable import MakeLatexTable
 total_word_count_in_parse 	= 0
 g_encoding 			= "utf8"  
 numberofcycles 			= 200
-howmanycandidatesperiteration 	= 25
-numberoflines 			=  0
+howmanycandidatesperiteration 	= 50
+numberoflines 			=  20000
+
+
+
  
-datadirectory 			= "../../data/english/"
-corpusfile 			= "browncorpus.txt"
-shortoutname 			= "wordbreaker-brownC-" 
 
 datadirectory 			= "../../data/french/"
 corpusfile 			= "encarta_french_UTF8.txt"
@@ -30,6 +30,9 @@ datadirectory 			= "../../data/spanish/"
 corpusfile 			= "DonQuijoteutf8.txt"
 shortoutname 			= "wordbreaker-donquijote-" 
 
+datadirectory 			= "../../data/english/"
+corpusfile 			= "browncorpus.txt"
+shortoutname 			= "wordbreaker-brownC-" 
 
 
 verboseflag = False
@@ -104,15 +107,20 @@ class Lexicon:
 	# ---------------------------------------------------------#	
 	# Found bug here July 5 2015: important, don't let it remove a singleton letter! John
 	def FilterZeroCountEntries(self, iteration_number):
+		TempDeletionList = dict()
 		for key, entry in self.m_EntryDict.items():
 			if len(key) == 1:
 				entry.m_Count = 1
 				continue
 			if entry.m_Count == 0:
+				print key, entry 
 				self.m_DeletionList.append((key, iteration_number))
 				self.m_DeletionDict[key] = 1
-				del self.m_EntryDict[key]
+				TempDeletionList[key] = 1		
 				print "Excluding this bad candidate: ", key
+		for key in TempDeletionList:
+			del self.m_EntryDict[key]
+			
 	# ---------------------------------------------------------#
 	def ReadCorpus(self, infilename):
 		print "Name of data file: ", infilename
